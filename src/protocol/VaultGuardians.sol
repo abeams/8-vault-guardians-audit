@@ -25,7 +25,7 @@
  * |_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_|
  */
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {VaultGuardiansBase, IERC20, SafeERC20} from "./VaultGuardiansBase.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
