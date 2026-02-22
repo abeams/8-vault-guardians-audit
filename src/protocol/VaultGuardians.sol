@@ -25,7 +25,7 @@
  * |_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_|
  */
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 import {VaultGuardiansBase, IERC20, SafeERC20} from "./VaultGuardiansBase.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -90,6 +90,7 @@ contract VaultGuardians is Ownable, VaultGuardiansBase {
      * @dev Since this is owned by the DAO, the funds will always go to the DAO. 
      * @param asset The ERC20 to sweep
      */
+    //@audit-check Check on this
     function sweepErc20s(IERC20 asset) external {
         uint256 amount = asset.balanceOf(address(this));
         emit VaultGuardians__SweptTokens(address(asset));

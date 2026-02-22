@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 import {Governor} from "@openzeppelin/contracts/governance/Governor.sol";
 import {GovernorCountingSimple} from "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
@@ -11,6 +11,7 @@ contract VaultGuardianGovernor is Governor, GovernorCountingSimple, GovernorVote
     constructor(IVotes _voteToken)
         Governor("VaultGuardianGovernor")
         GovernorVotes(_voteToken)
+        //@audit-written-high This means a quorum only needs 4%?
         GovernorVotesQuorumFraction(4)
     {}
 

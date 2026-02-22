@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 import {IPool, DataTypes} from "../../src/vendor/IPool.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC20Mock} from "./ERC20Mock.sol";
 
 contract AavePoolMock is IPool {
     mapping(address => address) public s_assetToAtoken;
@@ -12,10 +13,12 @@ contract AavePoolMock is IPool {
     }
 
     function supply(address asset, uint256 amount, address, /* onBehalfOf */ uint16 /* referralCode */ ) external {
+        ERC20Mock(s_assetToAtoken[asset]).mint(amount, msg.sender);
         IERC20(asset).transferFrom(msg.sender, address(this), amount);
     }
 
     function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
+        ERC20Mock(s_assetToAtoken[asset]).burn(amount, msg.sender);
         IERC20(asset).transfer(to, amount);
         return amount;
     }

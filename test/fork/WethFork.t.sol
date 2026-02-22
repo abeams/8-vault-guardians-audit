@@ -6,6 +6,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {VaultShares} from "../../src/protocol/VaultShares.sol";
 
 import {Fork_Test} from "./Fork.t.sol";
+import {console} from "forge-std/console.sol";
 
 contract WethForkTest is Fork_Test {
     address public guardian = makeAddr("guardian");
@@ -26,14 +27,22 @@ contract WethForkTest is Fork_Test {
     }
 
     modifier hasGuardian() {
-        weth.mint(mintAmount, guardian);
+        deal(address(weth), guardian, mintAmount);
+        console.log(weth.balanceOf(guardian));
         vm.startPrank(guardian);
-        weth.approve(address(vaultGuardians), mintAmount);
+        weth.approve(address(vaultGuardians), 10 ether);
         address wethVault = vaultGuardians.becomeGuardian(allocationData);
         wethVaultShares = VaultShares(wethVault);
         vm.stopPrank();
         _;
     }
 
+    function testUniswapPoolFailsForWeth() public hasGuardian {
+        assertEq(wethVaultShares.getUniswapLiquidtyToken(), address(0));
+        vm.expectRevert();
+        wethVaultShares.rebalanceFunds();
+    }
+
     function testDepositAndWithdraw() public {}
+
 }

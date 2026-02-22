@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 import {ERC4626, ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {IVaultShares, IERC4626} from "../interfaces/IVaultShares.sol";
@@ -7,8 +7,13 @@ import {AaveAdapter, IPool} from "./investableUniverseAdapters/AaveAdapter.sol";
 import {UniswapAdapter} from "./investableUniverseAdapters/UniswapAdapter.sol";
 import {DataTypes} from "../vendor/DataTypes.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, ReentrancyGuard {
+
+    using Math for uint256;
+
+
     error VaultShares__DepositMoreThanMax(uint256 amount, uint256 max);
     error VaultShares__NotGuardian();
     error VaultShares__NotVaultGuardianContract();
@@ -105,6 +110,7 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
         // External calls
         i_aaveAToken =
             IERC20(IPool(constructorData.aavePool).getReserveData(address(constructorData.asset)).aTokenAddress);
+        // @audit-written-high this breaks if asset is weth
         i_uniswapLiquidityToken = IERC20(i_uniswapFactory.getPair(address(constructorData.asset), address(i_weth)));
     }
 
@@ -137,6 +143,7 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
      * @notice Mints shares to the DAO and the guardian as a fee
      */
     // slither-disable-start reentrancy-eth
+    //@audit-written-med can bypass these fees by using mint?
     function deposit(uint256 assets, address receiver)
         public
         override(ERC4626, IERC4626)
@@ -150,7 +157,8 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
 
         uint256 shares = previewDeposit(assets);
         _deposit(_msgSender(), receiver, assets, shares);
-
+        //@audit-written-low fee is not charged on small deposits
+        //@audit-medium fee is inflationary?
         _mint(i_guardian, shares / i_guardianAndDaoCut);
         _mint(i_vaultGuardians, shares / i_guardianAndDaoCut);
 
@@ -178,6 +186,7 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
      * @notice Anyone can call this and pay the gas costs to rebalance the portfolio at any time. 
      * @dev We understand that this is horrible for gas costs. 
      */
+    //@audit-check This forces unstaking, any way to take advantage on the uniswap side? no access control
     function rebalanceFunds() public isActive divestThenInvest nonReentrant {}
 
     /**
@@ -257,6 +266,7 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
     /**
      * @return Uniswap's LP token
      */
+    //@audit-written-info typo
     function getUniswapLiquidtyToken() external view returns (address) {
         return address(i_uniswapLiquidityToken);
     }

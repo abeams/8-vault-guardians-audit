@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 import {Base_Test} from "../../Base.t.sol";
 import {VaultShares} from "../../../src/protocol/VaultShares.sol";
@@ -8,6 +8,9 @@ import {ERC20Mock} from "../../mocks/ERC20Mock.sol";
 import {VaultGuardiansBase} from "../../../src/protocol/VaultGuardiansBase.sol";
 
 contract VaultGuardiansDaoTest is Base_Test {
+
+    address attacker = makeAddr("attacker");
+
     function setUp() public override {
         Base_Test.setUp();
     }
@@ -15,5 +18,11 @@ contract VaultGuardiansDaoTest is Base_Test {
     function testDaoSetupIsCorrect() public {
         assertEq(vaultGuardianToken.balanceOf(msg.sender), 0);
         assertEq(vaultGuardianToken.owner(), address(vaultGuardians));
+    }
+
+    function testDaoTakeover() public {
+        assertEq(vaultGuardianToken.totalSupply(), 0);
+        deal(vaultGuardianToken, attacker, 10);
+        
     }
 }

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 abstract contract AStaticWethData {
+    //@audit-info This comment doesn't make any sense where it is
     // The following four tokens are the approved tokens the protocol accepts
     // The default values are for Mainnet
     IERC20 internal immutable i_weth;

@@ -25,7 +25,7 @@
  * |_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_||_|
  */
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 import {VaultShares} from "./VaultShares.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -45,6 +45,7 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
 
     error VaultGuardiansBase__NotEnoughWeth(uint256 amount, uint256 amountNeeded);
     error VaultGuardiansBase__NotAGuardian(address guardianAddress, IERC20 token);
+    //audit-info unused event (due to misuse of another event)
     error VaultGuardiansBase__CantQuitGuardianWithNonWethVaults(address guardianAddress);
     error VaultGuardiansBase__CantQuitWethWithThisFunction();
     error VaultGuardiansBase__TransferFailed();
@@ -62,6 +63,7 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
     address private immutable i_uniswapV2Router;
     VaultGuardianToken private immutable i_vgToken;
 
+    //@audit-written-low this is never charged
     uint256 private constant GUARDIAN_FEE = 0.1 ether;
 
     // DAO updatable values
@@ -76,8 +78,11 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
     event GuardianAdded(address guardianAddress, IERC20 token);
+    //@audit-written-info typo
     event GaurdianRemoved(address guardianAddress, IERC20 token);
+    //@audit-info unused events
     event InvestedInGuardian(address guardianAddress, IERC20 token, uint256 amount);
+    //@audit-written-info typo
     event DinvestedFromGuardian(address guardianAddress, IERC20 token, uint256 amount);
     event GuardianUpdatedHoldingAllocation(address guardianAddress, IERC20 token);
 
@@ -120,6 +125,7 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
      * 
      * @param wethAllocationData the allocation data for the WETH vault
      */
+    //@audit-low same address can become guardian for same token multiple times
     function becomeGuardian(AllocationData memory wethAllocationData) external returns (address) {
         VaultShares wethVault =
         new VaultShares(IVaultShares.ConstructorData({
@@ -166,6 +172,7 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
                 weth: address(i_weth),
                 usdc: address(i_tokenOne)
             }));
+            //@audit-written-low the vault name and symbol here is USDC even if the token is LINK
         } else if (address(token) == address(i_tokenTwo)) {
             tokenVault =
             new VaultShares(IVaultShares.ConstructorData({
@@ -268,12 +275,15 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
     function _becomeTokenGuardian(IERC20 token, VaultShares tokenVault) private returns (address) {
         s_guardians[msg.sender][token] = IVaultShares(address(tokenVault));
         emit GuardianAdded(msg.sender, token);
+        //@audit-low Price of i_vgToken depends on vault asset
+        //@audit-written-high Also, these are not pulled back later, so can't we infinitely mint these?
         i_vgToken.mint(msg.sender, s_guardianStakePrice);
         token.safeTransferFrom(msg.sender, address(this), s_guardianStakePrice);
         bool succ = token.approve(address(tokenVault), s_guardianStakePrice);
         if (!succ) {
             revert VaultGuardiansBase__TransferFailed();
         }
+        //@audit-written-medium Also, this means that a guardian can remove their stake without giving up control of the vault
         uint256 shares = tokenVault.deposit(s_guardianStakePrice, msg.sender);
         if (shares == 0) {
             revert VaultGuardiansBase__TransferFailed();
@@ -281,6 +291,8 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
         return address(tokenVault);
     }
     // slither-disable-end reentrancy-eth
+
+    //@audit-written-medium All of the view functions are broken because assets leave the vault
 
     /*//////////////////////////////////////////////////////////////
                    INTERNAL AND PRIVATE VIEW AND PURE

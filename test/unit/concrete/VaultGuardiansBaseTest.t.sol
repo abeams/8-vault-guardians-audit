@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 import {Base_Test} from "../../Base.t.sol";
 import {VaultShares} from "../../../src/protocol/VaultShares.sol";
@@ -28,7 +28,9 @@ contract VaultGuardiansBaseTest is Base_Test {
     AllocationData allocationData = AllocationData(500, 250, 250);
     AllocationData newAllocationData = AllocationData(0, 500, 500);
 
-    /*//////////////////////////////////////////////////////////////
+    AllocationData doNothingAllocation = AllocationData(1000, 0, 0);
+
+    /*///////////////////////////////////////////////////////1//////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
     event GuardianAdded(address guardianAddress, IERC20 token);
@@ -82,6 +84,8 @@ contract VaultGuardiansBaseTest is Base_Test {
         uint256 wethBalanceAfter = weth.balanceOf(address(guardian));
         assertEq(wethBalanceBefore - wethBalanceAfter, vaultGuardians.getGuardianStakePrice());
     }
+
+
 
     function testBecomeGuardianEmitsEvent() public {
         weth.mint(mintAmount, guardian);
@@ -143,6 +147,44 @@ contract VaultGuardiansBaseTest is Base_Test {
         assertEq(address(vaultGuardians.getVaultFromGuardianAndToken(guardian, weth)), address(0));
     }
 
+    function testCanCreateAndQuitGuardianToMintCheapDAOTokens() public {
+        // Set up a weth vault
+        assertEq(vaultGuardians.getGuardianStakePrice(), 10 ether);
+        weth.mint(10 ether, guardian);
+        vm.startPrank(guardian);
+        weth.approve(address(vaultGuardians), 10 ether);
+        address wethVault = vaultGuardians.becomeGuardian(doNothingAllocation);
+        wethVaultShares = VaultShares(wethVault);
+        vm.stopPrank();
+        
+        vm.startPrank(guardian);
+        wethVaultShares.approve(address(vaultGuardians), mintAmount);
+        vaultGuardians.quitGuardian();
+        vm.stopPrank();
+
+        // Weth balance is almost the same as initial balance (minus about 1/1000) 
+        assertEq(weth.balanceOf(guardian), 9990019960079840319);
+        // But the guardian gets to keep his governance tokens
+        assertEq(vaultGuardianToken.balanceOf(guardian), vaultGuardians.getGuardianStakePrice());
+    }
+
+    function testGuardianCanRemoveStakeWithoutDeactivatingVault() public hasGuardian {
+        // After the inflationary fee for the dao, guardian holds a little over 99.9% ownership
+        uint256 guardianCanWithdraw = wethVaultShares.previewRedeem(wethVaultShares.balanceOf(guardian));
+        assertEq(guardianCanWithdraw, 9990019960079840319);
+        
+        vm.startPrank(guardian);
+        console.log(wethVaultShares.balanceOf(guardian));
+        wethVaultShares.redeem(wethVaultShares.balanceOf(guardian), guardian, guardian);
+        vm.stopPrank();
+
+        // The balance remaining in the vault is only ~1/1000 of the minimum stake amount
+        assertEq(weth.balanceOf(address(wethVaultShares)), 9980039920159681);
+        // But the vault is still active
+        assertEq(wethVaultShares.getIsActive(), true);
+        assertEq(address(vaultGuardians.getVaultFromGuardianAndToken(guardian, weth)), address(wethVaultShares));
+    }
+
     function testQuitGuardianEmitsEvent() public hasGuardian {
         vm.startPrank(guardian);
         wethVaultShares.approve(address(vaultGuardians), mintAmount);
@@ -186,6 +228,18 @@ contract VaultGuardiansBaseTest is Base_Test {
 
         assertEq(usdcVaultShares.name(), vaultGuardians.TOKEN_ONE_VAULT_NAME());
         assertEq(usdcVaultShares.symbol(), vaultGuardians.TOKEN_ONE_VAULT_SYMBOL());
+    }
+
+    function testBecomeTokenGuardianLinkHasWrongName() public hasGuardian {
+        link.mint(mintAmount, guardian);
+        vm.startPrank(guardian);
+        link.approve(address(vaultGuardians), mintAmount);
+        address tokenVault = vaultGuardians.becomeTokenGuardian(allocationData, link);
+        linkVaultShares = VaultShares(tokenVault);
+        vm.stopPrank();
+
+        assertEq(linkVaultShares.name(), "Vault Guardian USDC");
+        assertEq(linkVaultShares.symbol(), "vgUSDC");
     }
 
     function testBecomeTokenGuardianTokenTwoNameEmitsEvent() public hasGuardian {

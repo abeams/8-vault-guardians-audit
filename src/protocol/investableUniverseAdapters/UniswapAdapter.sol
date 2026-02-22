@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 import {IUniswapV2Router01} from "../../vendor/IUniswapV2Router01.sol";
 import {IUniswapV2Factory} from "../../vendor/IUniswapV2Factory.sol";
@@ -16,6 +16,7 @@ contract UniswapAdapter is AStaticUSDCData {
 
     address[] private s_pathArray;
 
+    //@audit-written-low these events are thrown backwards if the token is weth
     event UniswapInvested(uint256 tokenAmount, uint256 wethAmount, uint256 liquidity);
     event UniswapDivested(uint256 tokenAmount, uint256 wethAmount);
 
@@ -27,8 +28,10 @@ contract UniswapAdapter is AStaticUSDCData {
     // slither-disable-start reentrancy-eth
     // slither-disable-start reentrancy-benign
     // slither-disable-start reentrancy-events
+    //@audit-info the doc should say USDC or LINK, but this doesn't even support LINK...
     /**
      * @notice The vault holds only one type of asset token. However, we need to provide liquidity to Uniswap in a pair
+     * 
      * @notice So we swap out half of the vault's underlying asset token for WETH if the asset token is USDC or WETH
      * @notice However, if the asset token is WETH, we swap half of it for USDC (tokenOne)
      * @notice The tokens we obtain are then added as liquidity to Uniswap pool, and LP tokens are minted to the vault
@@ -51,6 +54,7 @@ contract UniswapAdapter is AStaticUSDCData {
         if (!succ) {
             revert UniswapAdapter__TransferFailed();
         }
+        //@audit-written-medium this is susceptible to mev attacks, especially with no slippage
         uint256[] memory amounts = i_uniswapRouter.swapExactTokensForTokens({
             amountIn: amountOfTokenToSwap,
             amountOutMin: 0,
@@ -63,6 +67,7 @@ contract UniswapAdapter is AStaticUSDCData {
         if (!succ) {
             revert UniswapAdapter__TransferFailed();
         }
+        //@audit-written-medium I think this is approving more than it should
         succ = token.approve(address(i_uniswapRouter), amountOfTokenToSwap + amounts[0]);
         if (!succ) {
             revert UniswapAdapter__TransferFailed();
